@@ -1,0 +1,688 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>几何画板 · 正五边形与五角星</title>
+<style>
+  :root{
+    --bg:#c4d8e4;
+    --paper:#eaf2f8;
+    --ink:#193c54;
+    --ink2:#41627a;
+    --soft:#4d7fa2;
+    --aux:#8fb2c9;
+    --gold:#c08a2e;
+    --gold-d:#a8761f;
+    --line:#b9d1e0;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;overflow:hidden;}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--ink);
+    background:#a6c1d5;
+  }
+
+  /* 整个页面按 1600×900 设计稿等比缩放，永远保持 16:9 */
+  .stage{
+    position:absolute;left:50%;top:50%;
+    width:1600px;height:900px;
+    margin-left:-800px;margin-top:-450px;
+    transform-origin:center center;
+    background:
+      radial-gradient(1100px 760px at 22% -14%, rgba(255,255,255,.30) 0%, rgba(255,255,255,0) 62%),
+      var(--bg);
+    display:flex;flex-direction:column;
+    overflow:hidden;
+  }
+
+  .bar{display:flex;align-items:baseline;gap:18px;padding:22px 44px 6px;flex:0 0 auto;}
+  .bar h1{
+    margin:0;font-size:24px;letter-spacing:.05em;font-weight:600;color:var(--ink);
+    display:flex;align-items:center;gap:10px;
+  }
+  .bar h1::before{content:'';width:6px;height:23px;border-radius:3px;background:var(--gold);display:block;}
+  .bar p{margin:0;font-size:14.5px;color:#4f728b;letter-spacing:.02em;}
+
+  .app{
+    flex:1;min-height:0;
+    display:grid;grid-template-columns:minmax(0,1fr) 420px;
+    gap:20px;padding:8px 44px 6px;
+  }
+
+  .board-wrap{display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;}
+
+  .board{
+    position:relative;background:var(--paper);border-radius:12px;
+    box-shadow:0 0 0 1px #aac5d6, 0 22px 48px -22px rgba(24,62,90,.48);
+    overflow:hidden;flex:0 0 auto;
+  }
+  .board::after{
+    content:'';position:absolute;inset:0;pointer-events:none;border-radius:12px;
+    box-shadow:inset 0 0 90px rgba(150,185,210,.22);
+  }
+  .board svg{width:100%;height:100%;display:block;}
+
+  .panel{display:flex;flex-direction:column;gap:13px;min-height:0;overflow-y:auto;padding-right:2px;}
+  .panel::-webkit-scrollbar{width:6px;}
+  .panel::-webkit-scrollbar-thumb{background:#a6c2d4;border-radius:3px;}
+
+  .card{
+    background:rgba(246,251,254,.86);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;box-shadow:0 1px 3px rgba(30,70,100,.07);flex:0 0 auto;
+  }
+  .card h3{margin:0 0 11px;font-size:12px;letter-spacing:.16em;font-weight:600;color:#5b7f97;}
+
+  #stepList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;}
+  #stepList li{
+    display:flex;gap:9px;align-items:flex-start;
+    padding:8px 10px 8px 9px;border-radius:9px;cursor:pointer;
+    font-size:15px;line-height:1.55;color:var(--ink2);
+    border-left:2px solid transparent;transition:background .2s,color .2s,border-color .2s;
+  }
+  #stepList li:hover{background:#e6f0f7;}
+  #stepList li .num{
+    flex:0 0 20px;height:20px;border-radius:50%;background:#dbe9f3;color:#5b7f97;
+    font-size:12px;font-weight:600;display:grid;place-items:center;margin-top:2px;transition:.25s;
+  }
+  #stepList li.done .num{background:#c6dccc;color:#4f7a5b;}
+  #stepList li.active{background:#dcebf5;border-left-color:var(--gold);color:var(--ink);font-weight:600;}
+  #stepList li.active .num{background:var(--gold);color:#fff;}
+
+  .mrow{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:5px 2px;font-size:15px;color:var(--ink2);
+    border-bottom:1px dashed #d5e4ee;opacity:.18;transition:opacity .45s ease;
+  }
+  .mrow:last-child{border-bottom:0;}
+  .mrow.show{opacity:1;}
+  .mrow b{font-family:Georgia,"Times New Roman",serif;font-size:16px;font-weight:600;color:var(--ink);}
+  .mrow.key b{color:var(--gold-d);}
+
+  .hint{
+    background:#e7f1f8;border-color:#c2d9e7;
+    font-size:13.5px;line-height:1.75;color:#44657c;padding:14px 16px;
+  }
+  .hint::before{
+    content:'课堂提示';display:block;font-size:10.5px;letter-spacing:.14em;
+    color:#a8761f;font-weight:600;margin-bottom:5px;
+  }
+
+  .toolbar{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:12px 44px 22px;justify-content:flex-end;}
+  button{
+    font:inherit;font-size:15.5px;font-weight:500;padding:10px 24px;border-radius:9px;
+    border:1px solid #b3cbdb;background:#f6fafd;color:var(--ink);cursor:pointer;transition:.18s;
+  }
+  button:hover:not(:disabled){background:#e6f0f7;border-color:#94b6cb;}
+  button:disabled{opacity:.34;cursor:not-allowed;}
+  button.primary{
+    background:var(--gold);border-color:var(--gold);color:#fff;
+    box-shadow:0 3px 10px -3px rgba(168,118,31,.55);
+  }
+  button.primary:hover:not(:disabled){background:var(--gold-d);border-color:var(--gold-d);}
+  button.ghost{background:transparent;border-color:transparent;color:#5b7f97;padding:9px 12px;}
+  button.ghost:hover:not(:disabled){background:#bcd3e2;}
+
+  button#play{border-color:#ddc79a;background:#fdf8ec;color:var(--gold-d);font-weight:600;letter-spacing:.02em;}
+  button#play:hover:not(:disabled){background:#f9f0da;border-color:#d2b783;}
+  button#play.playing{
+    background:var(--gold);border-color:var(--gold);color:#fff;
+    box-shadow:0 3px 10px -3px rgba(168,118,31,.55);
+  }
+  button#play.playing:hover{background:var(--gold-d);border-color:var(--gold-d);}
+
+  .progress{flex:1;order:-1;display:flex;gap:6px;align-items:center;justify-content:flex-end;padding-right:6px;}
+  .progress i{display:block;width:34px;height:5px;border-radius:3px;background:#a9c3d4;transition:.35s ease;cursor:pointer;}
+  .progress i.on{background:var(--gold);}
+
+</style>
+<meta name="AIGC" content="{&#34;AIGC&#34;:{&#34;Label&#34;:&#34;1&#34;,&#34;ContentProducer&#34;:&#34;001191340000711771143J00000&#34;,&#34;ProduceID&#34;:&#34;01793e21877c13d1ef2989a89c1aa2b4b81faa47a9cc695f644ade526ec0dcf5&#34;,&#34;ReservedCode1&#34;:&#34;&#34;,&#34;ContentPropagator&#34;:&#34;001191340000711771143J00000&#34;,&#34;PropagateID&#34;:&#34;01793e21877c13d1ef2989a89c1aa2b4b81faa47a9cc695f644ade526ec0dcf5&#34;,&#34;ReservedCode2&#34;:&#34;&#34;}}"/></head>
+<body>
+
+<div class="stage" id="stage">
+
+<header class="bar">
+  <h1>几何画板 · 正五边形与五角星</h1>
+  <p>绕圆心每次旋转 72°，把一个圆五等分</p>
+</header>
+
+<div class="app">
+  <div class="board-wrap" id="boardWrap">
+    <section class="board" id="board">
+      <svg id="boardSvg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" role="img" aria-label="正五边形与五角星作图演示">
+        <defs>
+          <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+            <path d="M60 0 H0 V60" fill="none" stroke="#d7e5ee" stroke-width="1.4"></path>
+          </pattern>
+        </defs>
+        <rect x="0" y="0" width="1600" height="900" fill="url(#grid)"></rect>
+        <g id="scene"></g>
+      </svg>
+    </section>
+  </div>
+
+  <aside class="panel">
+    <div class="card">
+      <h3>作 图 步 骤</h3>
+      <ol id="stepList">
+        <li data-n="1"><span class="num">1</span><span class="txt">作 ⊙O，在圆上取一点 A 作为起点</span></li>
+        <li data-n="2"><span class="num">2</span><span class="txt">绕圆心 O 每次旋转 72°，依次得到 B、C、D、E</span></li>
+        <li data-n="3"><span class="num">3</span><span class="txt">顺次连接 A−B−C−D−E−A，得到正五边形</span></li>
+        <li data-n="4"><span class="num">4</span><span class="txt">隔点连接 A−C−E−B−D−A，得到五角星</span></li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>这 个 图 形 的 数</h3>
+      <div class="mrow" data-need="1"><span>中心角 360° ÷ 5</span><b>72°</b></div>
+      <div class="mrow" data-need="3"><span>每个内角</span><b>108°</b></div>
+      <div class="mrow" data-need="3"><span>内角和</span><b>540°</b></div>
+      <div class="mrow" data-need="4"><span>尖角（如 ∠CAD）</span><b>36°</b></div>
+      <div class="mrow key" data-need="4"><span>对角线 ÷ 边长</span><b>1.618</b></div>
+    </div>
+
+    <div class="card hint" id="hint">点击「下一步」，从画圆开始。</div>
+  </aside>
+</div>
+
+<footer class="toolbar">
+  <button id="prev">← 上一步</button>
+  <div class="progress" id="progress"></div>
+  <button id="next" class="primary">下一步 →</button>
+  <button id="play" title="自动依次演示全部步骤，播完自动重来（快捷键 P）">▶ 循环播放</button>
+  <button id="reset" class="ghost">重来</button>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const scene = document.getElementById('scene');
+
+  const INK   = '#193c54';
+  const SOFT  = '#4d7fa2';
+  const AUX   = '#8fb2c9';
+  const GOLD  = '#c08a2e';
+  const PAPER = '#eaf2f8';
+
+  /* ---------- 整页固定 16:9：1600×900 设计稿整体等比缩放 ---------- */
+  function fitStage(){
+    const stage = document.getElementById('stage');
+    if(!stage) return;
+    const s = Math.min(window.innerWidth / 1600, window.innerHeight / 900);
+    stage.style.transform = 'scale(' + s + ')';
+  }
+
+  /* ---------- 画板在舞台内保持 16:9 ---------- */
+  function fitBoard(){
+    const wrap = document.getElementById('boardWrap');
+    const board = document.getElementById('board');
+    if(!wrap || !board) return;
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    if(!w || !h) return;
+    const s = Math.min(w / 16, h / 9);
+    board.style.width  = (s * 16).toFixed(2) + 'px';
+    board.style.height = (s * 9).toFixed(2) + 'px';
+  }
+  function fitAll(){ fitStage(); fitBoard(); }
+  window.addEventListener('resize', fitAll);
+  fitAll();
+  window.addEventListener('load', fitAll);
+
+  /* ---------- 几何 ---------- */
+  const O  = {x:800, y:481};
+  const R  = 350;     // 外接圆半径
+  const AR = 95;      // 中心角弧半径
+
+  // θ 从正上方开始、顺时针增大
+  function pos(deg, r){
+    const t = deg * Math.PI / 180;
+    return { x: O.x + (r || R) * Math.sin(t), y: O.y - (r || R) * Math.cos(t) };
+  }
+
+  const DEG  = [0, 72, 144, 216, 288];
+  const NAME = ['A', 'B', 'C', 'D', 'E'];
+  const V    = DEG.map(function(d){ return pos(d); });
+
+  const EDGES = [[0,1],[1,2],[2,3],[3,4],[4,0]];
+  const DIAG  = [[0,2],[2,4],[4,1],[1,3],[3,0]];
+
+  /* ---------- DOM 小工具 ---------- */
+  function el(tag, attrs){
+    const e = document.createElementNS(NS, tag);
+    if(attrs) for(const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function txt(x, y, s, o){
+    o = o || {};
+    const t = el('text', {
+      x: x, y: y,
+      'text-anchor': o.anchor || 'middle',
+      'dominant-baseline': 'middle',
+      'font-size': o.size || 30,
+      'font-weight': o.weight || 400,
+      'font-style': o.italic ? 'italic' : 'normal',
+      'font-family': o.fam || '"Songti SC","Noto Serif SC","SimSun",Georgia,serif',
+      fill: o.fill || INK
+    });
+    t.textContent = s;
+    return t;
+  }
+
+  function dot(p, color, r){
+    return el('circle', {
+      cx: p.x, cy: p.y, r: r || 8,
+      fill: color || INK, stroke: PAPER, 'stroke-width': 3
+    });
+  }
+
+  function arcPath(cx, cy, r, a1, a2){
+    const p = function(a){
+      const t = a * Math.PI / 180;
+      return { x: cx + r * Math.sin(t), y: cy - r * Math.cos(t) };
+    };
+    const P1 = p(a1), P2 = p(a2);
+    const large = Math.abs(a2 - a1) > 180 ? 1 : 0;
+    const sweep = a2 > a1 ? 1 : 0;
+    return 'M ' + P1.x.toFixed(2) + ' ' + P1.y.toFixed(2) +
+           ' A ' + r + ' ' + r + ' 0 ' + large + ' ' + sweep + ' ' +
+           P2.x.toFixed(2) + ' ' + P2.y.toFixed(2);
+  }
+
+  /* ---------- 动画 ---------- */
+  const raf2 = function(fn){ requestAnimationFrame(function(){ requestAnimationFrame(fn); }); };
+
+  function easeInOut(p){
+    return p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+  }
+
+  function drawIn(node, delay, dur){
+    let len = 0;
+    try { len = node.getTotalLength(); } catch(e) { len = 0; }
+    if(!len){ fadeIn(node, delay || 0, 400); return; }
+
+    const D  = dur || 600;
+    const t0 = Date.now() + (delay || 0);
+
+    node.style.strokeDasharray  = String(len);
+    node.style.strokeDashoffset = String(len);
+    node.style.transition = 'none';
+
+    const halo = el('circle', {cx:0, cy:0, r:0, fill:GOLD, opacity:'0', 'pointer-events':'none'});
+    const tip  = el('circle', {cx:0, cy:0, r:0, fill:GOLD, stroke:PAPER, 'stroke-width':1.2, opacity:'0', 'pointer-events':'none'});
+    const host = node.parentNode;
+    if(!host) return;
+    host.appendChild(halo);
+    host.appendChild(tip);
+
+    setTimeout(function(){
+      if(tip.parentNode)  tip.parentNode.removeChild(tip);
+      if(halo.parentNode) halo.parentNode.removeChild(halo);
+    }, (delay || 0) + D + 420);
+
+    let started = false;
+
+    function frame(){
+      if(!tip.parentNode) return;
+      let p = (Date.now() - t0) / D;
+      if(p < 0){ requestAnimationFrame(frame); return; }
+      if(p > 1) p = 1;
+
+      if(!started){ started = true; tip.style.opacity = '1'; halo.style.opacity = '.30'; }
+
+      const e  = easeInOut(p);
+      const pt = node.getPointAtLength(len * e);
+      const r  = 5 + 1.8 * Math.sin(p * Math.PI);
+
+      node.style.strokeDashoffset = String(len * (1 - e));
+      tip.setAttribute('cx', pt.x.toFixed(2));
+      tip.setAttribute('cy', pt.y.toFixed(2));
+      tip.setAttribute('r', r.toFixed(2));
+      halo.setAttribute('cx', pt.x.toFixed(2));
+      halo.setAttribute('cy', pt.y.toFixed(2));
+      halo.setAttribute('r', (r * 2.8).toFixed(2));
+
+      if(p < 1){
+        requestAnimationFrame(frame);
+      } else {
+        node.style.strokeDashoffset = '0';
+        tip.style.transition  = 'opacity 300ms ease';
+        halo.style.transition = 'opacity 300ms ease';
+        tip.style.opacity  = '0';
+        halo.style.opacity = '0';
+        setTimeout(function(){
+          if(tip.parentNode)  tip.parentNode.removeChild(tip);
+          if(halo.parentNode) halo.parentNode.removeChild(halo);
+        }, 340);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function fadeIn(node, delay, dur){
+    node.style.opacity = '0';
+    node.style.transition = 'opacity ' + (dur || 420) + 'ms ease ' + (delay || 0) + 'ms';
+    node.getBoundingClientRect();
+    raf2(function(){ node.style.opacity = '1'; });
+  }
+
+  function popIn(node, delay){
+    node.style.transformBox = 'fill-box';
+    node.style.transformOrigin = 'center';
+    node.style.transform = 'scale(.15)';
+    node.style.opacity = '0';
+    node.style.transition =
+      'transform 420ms cubic-bezier(.34,1.56,.64,1) ' + (delay || 0) + 'ms, opacity 240ms ease ' + (delay || 0) + 'ms';
+    node.getBoundingClientRect();
+    raf2(function(){ node.style.transform = 'scale(1)'; node.style.opacity = '1'; });
+  }
+
+  /* ---------- 逐步构建 ---------- */
+  function buildStep(n, anim){
+    const g = el('g');
+    scene.appendChild(g);
+
+    const add  = function(node){ g.appendChild(node); return node; };
+    const draw = function(node, d, dur){ if(anim) drawIn(node, d, dur); };
+    const pop  = function(node, d){ if(anim) popIn(node, d); };
+    const fade = function(node, d, dur){ if(anim) fadeIn(node, d, dur); };
+
+    /* 画五个顶点（重绘到当前层顶部用） */
+    function drawVertices(animated, base){
+      NAME.forEach(function(nm, k){
+        const d = add(dot(V[k], INK));
+        const t = add(txt(pos(DEG[k], R + 38).x, pos(DEG[k], R + 38).y, nm, {size:30, weight:600}));
+        if(animated){ pop(d, base + k * 90); fade(t, base + k * 90 + 40); }
+      });
+    }
+
+    /* ① 作圆、定圆心、取起点 A */
+    if(n === 1){
+      const circ = add(el('circle', {
+        cx:O.x, cy:O.y, r:R, fill:'none',
+        stroke:AUX, 'stroke-width':2.2, 'stroke-dasharray':'11 11'
+      }));
+      fade(circ, 0, 620);
+
+      const oa = add(el('line', {
+        x1:O.x, y1:O.y, x2:V[0].x, y2:V[0].y,
+        stroke:AUX, 'stroke-width':2, 'stroke-dasharray':'9 9'
+      }));
+      draw(oa, 380, 420);
+
+      pop(add(dot(O, INK, 7)), 60);
+      fade(add(txt(O.x + 22, O.y + 26, 'O', {size:26, anchor:'start', weight:600})), 160);
+
+      pop(add(dot(V[0], INK)), 700);
+      fade(add(txt(pos(0, R + 38).x, pos(0, R + 38).y, 'A', {size:30, weight:600})), 760);
+    }
+
+    /* ② 每次旋转 72°，依次得到 B、C、D、E */
+    if(n === 2){
+      if(anim){
+        [1, 2, 3, 4].forEach(function(k, i){
+          spin(g, DEG[k - 1], DEG[k], i * 520, 460, function(){
+            const d = add(dot(V[k], INK));
+            popIn(d, 0);
+            const lp = pos(DEG[k], R + 38);
+            const t = add(txt(lp.x, lp.y, NAME[k], {size:30, weight:600}));
+            fadeIn(t, 60, 360);
+          }, i === 0);
+        });
+
+        // 最后一段 E→A，把圆环闭合
+        spin(g, DEG[4], 360, 4 * 520, 460, null, false);
+      } else {
+        // 静态还原：五条半径 + 完整圆环 + 五个顶点
+        DEG.forEach(function(d){
+          const p = pos(d);
+          add(el('line', {
+            x1:O.x, y1:O.y, x2:p.x, y2:p.y,
+            stroke:AUX, 'stroke-width':2, 'stroke-dasharray':'9 9', opacity:.55
+          }));
+        });
+        add(el('circle', {cx:O.x, cy:O.y, r:AR, fill:'none', stroke:GOLD, 'stroke-width':2.4, opacity:.5}));
+        add(txt(pos(36, 132).x, pos(36, 132).y, '72°', {size:22, fill:GOLD, weight:700}));
+
+        add(dot(O, INK, 7));
+        add(txt(O.x + 22, O.y + 26, 'O', {size:26, anchor:'start', weight:600}));
+        drawVertices(false, 0);
+      }
+    }
+
+    /* ③ 顺次连接，正五边形 */
+    if(n === 3){
+      EDGES.forEach(function(e, i){
+        const a = V[e[0]], b = V[e[1]];
+        const ln = add(el('line', {
+          x1:a.x, y1:a.y, x2:b.x, y2:b.y,
+          stroke:INK, 'stroke-width':4.5, 'stroke-linecap':'round'
+        }));
+        draw(ln, i * 130, 400);
+      });
+
+      // 顶点压在最上层
+      add(dot(O, INK, 7));
+      drawVertices(false, 0);
+    }
+
+    /* ④ 隔点连接，五角星 */
+    if(n === 4){
+      DIAG.forEach(function(e, i){
+        const a = V[e[0]], b = V[e[1]];
+        const ln = add(el('line', {
+          x1:a.x, y1:a.y, x2:b.x, y2:b.y,
+          stroke:GOLD, 'stroke-width':5, 'stroke-linecap':'round'
+        }));
+        draw(ln, i * 150, 440);
+      });
+
+      drawVertices(false, 0);
+
+      fade(add(txt(800, 860, 'A—C—E—B—D—A', {
+        size:24, fill:GOLD, weight:700,
+        fam:'"PingFang SC","Microsoft YaHei",sans-serif'
+      })), 780, 600);
+    }
+  }
+
+  /* 绕 O 转臂扫描：从 a1 转到 a2，画出轨迹弧，结束回调 */
+  function spin(g, a1, a2, delay, dur, onEnd, withLabel){
+    const p0 = pos(a1);
+    const arm = el('line', {
+      x1:O.x, y1:O.y, x2:p0.x, y2:p0.y,
+      stroke:GOLD, 'stroke-width':3.5, 'stroke-linecap':'round'
+    });
+    const arc = el('path', {
+      d: arcPath(O.x, O.y, AR, a1, a1 + 0.01),
+      fill:'none', stroke:GOLD, 'stroke-width':2.4, 'stroke-linecap':'round'
+    });
+    arm.style.opacity = '0';
+    arc.style.opacity = '0';
+    g.appendChild(arm);
+    g.appendChild(arc);
+
+    setTimeout(function(){
+      if(!g.parentNode) return;
+      arm.style.opacity = '1';
+      arc.style.opacity = '1';
+
+      const t0 = Date.now();
+      (function frame(){
+        if(!g.parentNode) return;
+        let p = (Date.now() - t0) / dur;
+        if(p > 1) p = 1;
+        const e  = easeInOut(p);
+        const a  = a1 + (a2 - a1) * e;
+        const pt = pos(a);
+
+        arm.setAttribute('x2', pt.x.toFixed(2));
+        arm.setAttribute('y2', pt.y.toFixed(2));
+        arc.setAttribute('d', arcPath(O.x, O.y, AR, a1, a));
+
+        if(p < 1){
+          requestAnimationFrame(frame);
+        } else {
+          // 转臂留成半径虚线
+          arm.setAttribute('stroke', AUX);
+          arm.setAttribute('stroke-width', 2);
+          arm.setAttribute('stroke-dasharray', '9 9');
+          arm.style.opacity = '.55';
+          // 轨迹弧留成淡金
+          arc.style.opacity = '.5';
+
+          if(withLabel){
+            const lp = pos(36, 132);
+            const lb = el('text', {
+              x: lp.x, y: lp.y, 'text-anchor':'middle', 'dominant-baseline':'middle',
+              'font-size':22, 'font-weight':700, fill:GOLD,
+              'font-family':'"PingFang SC","Microsoft YaHei",sans-serif', opacity:'0'
+            });
+            lb.textContent = '72°';
+            g.appendChild(lb);
+            fadeIn(lb, 30, 380);
+          }
+          if(onEnd) onEnd();
+        }
+      })();
+    }, delay);
+  }
+
+  /* ---------- 状态与导航 ---------- */
+  const MAX = 4;
+  let cur = 0;
+
+  function goto(n){
+    n = Math.max(0, Math.min(MAX, n));
+    while(scene.children.length > n && scene.lastElementChild){
+      scene.removeChild(scene.lastElementChild);
+    }
+    for(let i = scene.children.length + 1; i <= n; i++){
+      buildStep(i, i === n);
+    }
+    cur = n;
+    updateUI(n);
+  }
+
+  const HINTS = [
+    '点击「下一步」，从画圆开始。',
+    '针尖扎在 O，笔尖张开到 A，一笔画出一个完整的圆；A 取在圆的最高点。',
+    '针尖不动，只转笔杆：每转 72°（360°÷5）在圆上落一点 —— 依次得到 B、C、D、E，正好绕回 A。',
+    '直尺依次连 A—B、B—C、C—D、D—E、E—A，五条边一样长，就是正五边形。',
+    '隔一个点连：A—C、C—E、E—B、B—D、D—A —— 五条对角线画完，五角星就出来了。'
+  ];
+
+  const progress = document.getElementById('progress');
+  for(let i = 1; i <= MAX; i++){
+    const bar = document.createElement('i');
+    bar.dataset.n = i;
+    bar.title = '第 ' + i + ' 步';
+    bar.addEventListener('click', function(){ stop(); goto(Number(this.dataset.n)); });
+    progress.appendChild(bar);
+  }
+
+  function updateUI(n){
+    document.querySelectorAll('#stepList li').forEach(function(li){
+      const k = Number(li.dataset.n);
+      li.classList.toggle('active', k === n);
+      li.classList.toggle('done', k < n);
+    });
+    document.querySelectorAll('.mrow').forEach(function(r){
+      r.classList.toggle('show', Number(r.dataset.need) <= n);
+    });
+    document.getElementById('hint').textContent = HINTS[n] || HINTS[0];
+
+    Array.prototype.forEach.call(progress.children, function(bar, i){
+      bar.classList.toggle('on', i < n);
+    });
+
+    document.getElementById('prev').disabled = n <= 0;
+    document.getElementById('next').disabled = n >= MAX;
+  }
+
+  function next(){ if(cur < MAX) goto(cur + 1); }
+  function prev(){ if(cur > 0) goto(cur - 1); }
+  function reset(){ scene.innerHTML = ''; cur = 0; goto(1); }
+
+  /* ---------- 循环播放 ---------- */
+  const DWELL = { 1:1900, 2:3700, 3:1900, 4:2300 };
+  const HOLD_END = 3200;
+
+  let playing = false;
+  let timer = null;
+
+  function syncPlay(){
+    const b = document.getElementById('play');
+    if(!b) return;
+    b.textContent = playing ? '❙❙ 暂停' : '▶ 循环播放';
+    b.classList.toggle('playing', playing);
+    b.setAttribute('aria-pressed', playing ? 'true' : 'false');
+  }
+
+  function stop(){
+    if(timer){ clearTimeout(timer); timer = null; }
+    if(playing){ playing = false; syncPlay(); }
+  }
+
+  function tick(){
+    if(!playing) return;
+    if(cur >= MAX){
+      timer = setTimeout(function(){
+        if(!playing) return;
+        reset();
+        timer = setTimeout(tick, DWELL[1]);
+      }, HOLD_END);
+      return;
+    }
+    goto(cur + 1);
+    timer = setTimeout(tick, DWELL[cur + 1] || 1900);
+  }
+
+  function start(){
+    if(playing) return;
+    playing = true;
+    syncPlay();
+    if(cur >= MAX){
+      reset();
+      timer = setTimeout(tick, DWELL[1]);
+    } else {
+      tick();
+    }
+  }
+
+  function togglePlay(){ if(playing) stop(); else start(); }
+
+  /* ---------- 事件 ---------- */
+  document.getElementById('next').addEventListener('click', function(){ stop(); next(); });
+  document.getElementById('prev').addEventListener('click', function(){ stop(); prev(); });
+  document.getElementById('reset').addEventListener('click', function(){ stop(); reset(); });
+  document.getElementById('play').addEventListener('click', togglePlay);
+
+  document.querySelectorAll('#stepList li').forEach(function(li){
+    li.addEventListener('click', function(){ stop(); goto(Number(li.dataset.n)); });
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter'){
+      e.preventDefault(); stop(); next();
+    } else if(e.key === 'ArrowLeft'){
+      e.preventDefault(); stop(); prev();
+    } else if(e.key === 'r' || e.key === 'R'){
+      e.preventDefault(); stop(); reset();
+    } else if(e.key === 'p' || e.key === 'P'){
+      e.preventDefault(); togglePlay();
+    }
+  });
+
+  /* ---------- 启动 ---------- */
+  updateUI(0);
+  setTimeout(function(){ goto(1); }, 400);
+
+})();
+</script>
+
+
+<p id="aigc-visible-label" data-aigc-label="v1" role="note" style="display:block!important;visibility:visible!important;opacity:1!important;position:static!important;color:#808080!important;background:transparent!important;border:0!important;font:10px/1.3 sans-serif!important;text-align:right!important;padding:0!important;margin:4px 0 0!important;height:auto!important;max-height:none!important;overflow:visible!important;">AI生成</p></body></html>
